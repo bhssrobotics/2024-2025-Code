@@ -36,7 +36,7 @@ import com.qualcomm.robotcore.util.Range;
 
 /**
  * This file provides basic Telop driving for a Pushbot robot.
- * The code is structured as an Iterative OpMod e
+ * The code is structured as an Iterative OpMode
  *
  * This OpMode uses the common Pushbot hardware class to define the devices on the robot.
  * All device access is managed through the HardwarePushbot class.
@@ -50,20 +50,23 @@ import com.qualcomm.robotcore.util.Range;
  */
 
 @TeleOp(name="Pushbot: Teleop Tank", group="Pushbot")
-public class PushbotTeleopTank_Iterative extends OpMode{
-
+public class PushbotTeleopTank_Iterative extends OpMode
+{
     /* Declare OpMode members. */
     HardwarePushbot robot       = new HardwarePushbot(); // use the class created to define a Pushbot's hardware
     double          clawOffset  = 0.0 ;                  // Servo mid position
     final double    CLAW_SPEED  = 0.02 ;                 // sets rate to move servo
-
+    
+    final double ARM_UP_POWER = 0.4;
+    final double ARM_DOWN_POWER = -0.4;
     String armStatus = "";
 
     /*
      * Code to run ONCE when the driver hits INIT
      */
     //@Override
-    public void init() {
+    public void init() 
+    {
         /* Initialize the hardware variables.
          * The init() method of the hardware class does all the work here
          */
@@ -77,85 +80,106 @@ public class PushbotTeleopTank_Iterative extends OpMode{
      * Code to run REPEATEDLY after the driver hits INIT, but before they hit PLAY
      */
     //@Override
-    public void init_loop() {
+    public void init_loop() 
+    {
     }
 
     /*
      * Code to run ONCE when the driver hits PLAY
      */
     //@Override
-    public void start() {
+    public void start() 
+    {
     }
 
     /*
      * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
      */
     // @Override
-    public void loop() {
-        double left;
-        double right;
+    public void loop() 
+    {
+        
+        double forward = - gamepad1.left_stick_y;
+        double strafe = gamepad1.left_stick_x;
+        double turn = gamepad1.right_stick_x;
+        
+        //Controls the speed for going across the field; can be changed if going too slow
+            //strafe is lateral movement!!! Looking forward while moving sideways
+            //if(gamepad1.right_bumper)
+            //{
+              //  forward /= 4;  
+             //   strafe /= 4;
+             //   turn /= 4;
+            //}
+            
+        double denominator = Math.max(Math.abs(forward) + Math.abs(strafe) + Math.abs(turn), 1);
+            
+        robot.rightFrontDriveWheel.setPower((forward - strafe - turn) / denominator);
+        robot.leftFrontDriveWheel.setPower((forward + strafe + turn) / denominator);
+        robot.leftBackDriveWheel.setPower((forward - strafe + turn) / denominator);
+        robot.rightBackDriveWheel.setPower((forward + strafe - turn) / denominator);
 
-        // Run wheels in tank mode (note: The joystick goes negative when pushed forwards, so negate it)
-        left = gamepad1.left_stick_y;
-        right = gamepad1.right_stick_y;
+        // //Use gamepad left & right Bumpers to open and close the claw
+        // if (gamepad2.right_bumper)
+        //     clawOffset += CLAW_SPEED;
+        // else if (gamepad2.left_bumper)
+        //     clawOffset -= CLAW_SPEED;
 
-        robot.leftDriveWheel.setPower(left);
-        robot.rightDriveWheel.setPower(right);
-        telemetry.addData("Left", "" + left);
-        telemetry.addData("Right", "" + right);
-
-        //Use gamepad left & right Bumpers to open and close the claw
-        if (gamepad2.right_bumper)
-            clawOffset += CLAW_SPEED;
-        else if (gamepad2.left_bumper)
-            clawOffset -= CLAW_SPEED;
-
-        // Move both servos to new position.  Assume servos are mirror image of each other.
-        clawOffset = Range.clip(clawOffset, -0.5, 0.5);
-        // robot.leftClaw.setPosition(robot.MID_SERVO + clawOffset);
-        robot.grip.setPosition(robot.MID_SERVO + clawOffset);
+        // // Move both servos to new position.  Assume servos are mirror image of each other.
+        // clawOffset = Range.clip(clawOffset, -0.5, 0.5);
+        // // robot.leftClaw.setPosition(robot.MID_SERVO + clawOffset);
+        // robot.grip.setPosition(robot.MID_SERVO + clawOffset);
 
         // Use gamepad buttons to move the arm up (Y) and down (A)
         if (gamepad2.y)
         {
-            robot.armMotor.setPower(robot.ARM_UP_POWER);
-            armStatus = "up";
+          robot.armMotor.setPower(ARM_UP_POWER);
+          armStatus = "up";
         }
         else if (gamepad2.a)
-        {
-            robot.armMotor.setPower(robot.ARM_DOWN_POWER);
-            armStatus = "down";
-        }
-        else
-        {
-            robot.armMotor.setPower(0.0);
-            armStatus = "no power";
-        }
-        telemetry.addData("Arm", armStatus);
-        
+         {
+             robot.armMotor.setPower(ARM_DOWN_POWER);
+             armStatus = "down";
+         }
+         else
+         {
+             robot.armMotor.setPower(0);
+         }
         if (gamepad2.dpad_down)
-        {
-            robot.shoulderMotor.setPower(robot.ARM_DOWN_POWER);
-        }
-        else if (gamepad2.dpad_up)
-        {
-            robot.shoulderMotor.setPower(robot.ARM_UP_POWER);
+         {
+             robot.verticalMotor.setPower(ARM_UP_POWER);
+         }
+         else if (gamepad2.dpad_up)
+         {
+             robot.verticalMotor.setPower(ARM_DOWN_POWER);
         }
         else
         {
-            robot.shoulderMotor.setPower(0.0);
+            //setting power to 0 so that when buttons arent being held down it dosent move!!
+            robot.verticalMotor.setPower(ARM_DOWN_POWER);
+        }
+        
+        if(gamepad1.right_bumper)
+        {
+          robot.clawServo.setPosition(0.1);
+        }
+        else if(gamepad1.left_bumper)
+        {
+          robot.clawServo.setPosition(0.0);
         }
 
-        // Send telemetry message to signify robot running;
-        telemetry.addData("claw",  "Offset = %.2f", clawOffset);
-        telemetry.addData("left",  "%.2f", left);
-        telemetry.addData("grip", "%.2f", right);
+    //     // Send telemetry message to signify robot running;
+    //     telemetry.addData("claw",  "Offset = %.2f", clawOffset);
+    //     telemetry.addData("left",  "%.2f", left);
+    //     telemetry.addData("grip", "%.2f", right);
     }
 
     /*
      * Code to run ONCE after the driver hits STOP
      */
-    //@Override
-    public void stop() {
-    }
+        @Override
+     public void stop() 
+     {
+         
+     }
 }
